@@ -1,0 +1,119 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 21 09:38:47 2019
+
+@author: habiba.mariam
+"""
+import pandas as pd
+df = pd.read_csv('text_analytics_sample.csv')
+df.head()
+from io import StringIO
+col = ['outcome subject', 'text ']
+df = df[col]
+df = df[pd.notnull(df['outcome subject'])]
+
+df.columns = ['outcome_subject', 'text']
+
+df['category_id'] = df['outcome_subject'].factorize()[0]
+category_id_df = df[['outcome_subject', 'category_id']].drop_duplicates().sort_values('category_id')
+category_to_id = dict(category_id_df.values)
+id_to_category = dict(category_id_df[['category_id', 'outcome_subject']].values)
+df.head()
+
+import matplotlib.pyplot as plt
+fig = plt.figure(figsize=(8,6))
+df.groupby('outcome_subject').text.count().plot.bar(ylim=0)
+plt.show()
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer(sublinear_tf=True, min_df=5, norm='l2', encoding='latin-1', ngram_range=(1, 2), stop_words='english')
+features = tfidf.fit_transform(df.text).toarray()
+labels = df.category_id
+features.shape
+
+from sklearn.feature_selection import chi2
+import numpy as np
+N = 2
+for outcome_subject, category_id in sorted(category_to_id.items()):
+  features_chi2 = chi2(features, labels == category_id)
+  indices = np.argsort(features_chi2[0])
+  feature_names = np.array(tfidf.get_feature_names())[indices]
+  unigrams = [v for v in feature_names if len(v.split(' ')) == 1]
+  bigrams = [v for v in feature_names if len(v.split(' ')) == 2]
+  print("# '{}':".format(outcome_subject))
+  print("  . Most correlated unigrams:\n. {}".format('\n. '.join(unigrams[-N:])))
+  print("  . Most correlated bigrams:\n. {}".format('\n. '.join(bigrams[-N:])))
+
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.naive_bayes import MultinomialNB
+X_train, X_test, y_train, y_test = train_test_split(df['text'], df['outcome_subject'], random_state = 0)
+count_vect = CountVectorizer()
+X_train_counts = count_vect.fit_transform(X_train)
+tfidf_transformer = TfidfTransformer()
+X_train_tfidf = tfidf_transformer.fit_transform(X_train_counts)
+clf = MultinomialNB().fit(X_train_tfidf, y_train)
+  
+print(clf.predict(count_vect.transform(["Particle Physics Rolling Grant 2009Particle physics attempts to understand the Universe and its evolution in terms of the interplay of a small number of fundamental forces and particles. The last thirty years has seen the development of a robust and extremely successful theoretical framework, known as the Standard Model, in which all available data can be explained. However, this model is demonstrably incomplete and has many parameters that must be inserted by hand. Our proposed progamme will significantly advance our understanding of whatever theory must be constructed to replace the Standard Model. Our collaboration in the SNO experiment has been a major contributor to our understanding of the phenomenon of neutrino mass, originally outside the Standard Model. As SNO draws to an end, we will continue our neutrino investigations with a leading role in the MINOS experiment and the next generation experiment based in Japan, T2K. We plan to measure other fundamental properties of the neutrino, such as whether or not it is its own antiparticle - a Majorana or a Dirac neutrino - by utilising our unique experience with the SNO experiment and its underground laboratory. The CDF experiment is coming to the end of its life as LHC takes over the energy frontier, but we intend to continue our important contributions to the remaining running and in the exploitation of the full data sample to produce papers. The ZEUS experiment has now completed data taking; we are determined to play a major part in bringing these classic results on the structure of the proton, and the strong interaction, to publication. These results are likely to remain in the text-books for many years. After the disappointment of the failure of the LHC in 2008, repairs are well under way and the LHC experiments will come on line during the period of this Rolling Grant. We will ensure that Oxford plays a major role in the extraction of physics results from ATLAS and LHCb, which have the potential to completely revolutionise our understanding of particle physics. We are committed to providing the computing resources and analysis tools necessary for the extraction of these results, and our work in ensuring that Grid concepts and technology are available to the wider academic and business community will continue. The CRESST-II and cryo-EDM experiments will use technologies in which Oxford has a world lead to explore some of the most important questions in particle physics and cosmology; in particular the nature off the material that appears to make up most of the Universe. The spokesman of a major new initiative in this area, EURECA, is from Oxford, so that we will continue our leading role in the search for Dark Matter. The John Adams Institute for Accelerator Science has major programmes in the accelerators of the future, including Linear Colliders and the Neutrino Factory. The JAI has established itself as a world-class institute in accelerator physics under the leadership of Professor Peach; we are starting the search for a world-class accelerator scientist to be his successor. We are also providing leaders in international bodies charged with the development of new accelerators. We will continue to develop and enhance our capabilities in mechanical and electronics design so that Oxford will retain the ability to construct the most sophisticated apparatus of whatever size is required for the physics objectives. We are determined to play a leading role in world particle physics in the future, as we have ."])))  
+
+print(clf.predict(count_vect.transform(["Agriculture and Food SecurityTheme: Agriculture and Food Security"])))  
+print(clf.predict(count_vect.transform(["tbastudent to undertake 3 rotations before choosing phd project"])))  
+print(clf.predict(count_vect.transform(["A Journey through Space and Time: an examination of the reiterative conceptualisation of space in urban Yorkshire through the Gott CollectionA Journey through Space and Time: an examination of the reiterative conceptualisation of space in urban Yorkshire through the Gott Collection"])))  
+
+print(clf.predict(count_vect.transform(["Molecular mechanisms underlying fibroblast motility and scar contraction during ocular wound healingAbstracts are not currently available in GtR for all funded research. This is normally because the abstract was not required at the time of proposal submission, but may be because it included sensitive information such as personal details."])))
+
+print(clf.predict(count_vect.transform(["Agriculture and Food SecurityTheme: Agriculture and Food Security"])))  
+print(clf.predict(count_vect.transform(["Agriculture and Food SecurityTheme: Agriculture and Food Security"])))  
+print(clf.predict(count_vect.transform(["Agriculture and Food SecurityTheme: Agriculture and Food Security"])))  
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import LinearSVC
+from sklearn.model_selection import cross_val_score
+models = [
+    RandomForestClassifier(n_estimators=200, max_depth=3, random_state=0),
+    LinearSVC(),
+    MultinomialNB(),
+    LogisticRegression(random_state=0),
+] 
+CV = 5
+cv_df = pd.DataFrame(index=range(CV * len(models)))
+entries = []
+for model in models:
+  model_name = model.__class__.__name__
+  accuracies = cross_val_score(model, features, labels, scoring='accuracy', cv=CV)
+  for fold_idx, accuracy in enumerate(accuracies):
+    entries.append((model_name, fold_idx, accuracy))
+cv_df = pd.DataFrame(entries, columns=['model_name', 'fold_idx', 'accuracy'])
+import seaborn as sns
+sns.boxplot(x='model_name', y='accuracy', data=cv_df)
+sns.stripplot(x='model_name', y='accuracy', data=cv_df, 
+              size=8, jitter=True, edgecolor="gray", linewidth=2)
+plt.show()  
+
+cv_df.groupby('model_name').accuracy.mean()
+
+model = LinearSVC()
+X_train, X_test, y_train, y_test, indices_train, indices_test = train_test_split(features, labels, df.index, test_size=0.33, random_state=0)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+from sklearn.metrics import confusion_matrix
+conf_mat = confusion_matrix(y_test, y_pred)
+fig, ax = plt.subplots(figsize=(10,10))
+sns.heatmap(conf_mat, annot=True, fmt='d',
+            xticklabels=category_id_df.outcome_subject.values, yticklabels=category_id_df.outcome_subject.values)
+plt.ylabel('Actual')
+plt.xlabel('Predicted')
+plt.show()
+
+from IPython.display import display
+for predicted in category_id_df.category_id:
+  for actual in category_id_df.category_id:
+    if predicted != actual and conf_mat[actual, predicted] >= 10:
+      print("'{}' predicted as '{}' : {} examples.".format(id_to_category[actual], id_to_category[predicted], conf_mat[actual, predicted]))
+      display(df.loc[indices_test[(y_test == actual) & (y_pred == predicted)]][['outcome_subject', 'text']])
+      print('')
+      
+from sklearn import metrics
+print(metrics.classification_report(y_test, y_pred,target_names=df['outcome_subject'].unique()))
