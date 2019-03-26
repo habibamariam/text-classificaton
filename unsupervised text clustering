@@ -1,0 +1,144 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Mar 13 10:06:30 2019
+
+@author: habiba.mariam
+"""
+import pandas as pd
+data_frame = pd.read_csv(r'C:\text classification\nlp\ukri_projects2.csv')
+df = data_frame
+print(len(df))
+print(df.head())
+
+# df = df.ix[pd.notnull(df['subject percentage'])]
+#df = df.loc[pd.notnull(df['title'])]
+print(len(df))
+#df = df.loc[pd.notnull(df['topic'])]
+#print(len(df))
+#df = df.sort_values(by="subject percentage",ascending=False).drop_duplicates(subset=['title'],keep='first')
+#print(len(df))
+#df = df.sort_values(by="amount",ascending=False)
+# df = df.head(n=5000)
+#df.head(n=2)
+df_filtered =df['Lead Funder']=='Innovate UK'
+df_innovateUK=df[df_filtered]
+print(len(df_innovateUK))
+
+data_frame = df_innovateUK
+data_frame.describe()
+data_frame_2 = data_frame
+data_frame_2.iloc[10]['Abstract']
+from rake_nltk import Rake
+r = Rake()
+r.extract_keywords_from_text(data_frame_2.iloc[8]['Abstract'])
+print ('\n'.join(r.get_ranked_phrases()))
+import pandas as pd
+import numpy as np
+from sklearn.manifold import TSNE
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import NMF
+import random 
+random.seed(13)
+
+#visualization packages
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import matplotlib
+n_features = 1000
+n_topics = 25
+n_top_words = 8
+topics = []
+
+
+def print_top_words(model, feature_names, n_top_words):
+    for topic_idx, topic in enumerate(model.components_):
+        topics.append(" ".join([feature_names[i]
+                        for i in topic.argsort()[:-2 - 1:-1]]))
+        print("\nTopic #%d:" % topic_idx)
+        print(" ".join([feature_names[i]
+                        for i in topic.argsort()[:-n_top_words - 1:-1]]))
+    print()
+
+
+tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=2,max_features=n_features,stop_words='english')
+tfidf = tfidf_vectorizer.fit_transform(data_frame_2['Abstract'])
+nmf = NMF(n_components=n_topics, random_state=0,alpha=.1, l1_ratio=.5).fit(tfidf)
+
+print("Topics found via NMF:")
+tfidf_feature_names = tfidf_vectorizer.get_feature_names()
+print_top_words(nmf, tfidf_feature_names, n_top_words)
+nmf_embedding = nmf.transform(tfidf)
+nmf_embedding = (nmf_embedding - nmf_embedding.mean(axis=0))/nmf_embedding.std(axis=0)
+top_idx = np.argsort(nmf_embedding,axis=0)[-10:]
+
+count = 0
+for idxs in top_idx.T: 
+    print("\nTopic {}:".format(count))
+    for idx in idxs:
+        print(data_frame_2.iloc[idx]['title'])
+    count += 1
+tsne = TSNE(random_state=321,verbose=2,perplexity=100)
+tsne_embedding = tsne.fit_transform(nmf_embedding)
+tsne_embedding = pd.DataFrame(tsne_embedding,columns=['x','y'])
+tsne_embedding['hue'] = nmf_embedding.argmax(axis=1)
+colors = np.array([
+ [ 0.89411765,  0.10196079,  0.10980392,  1. ],
+ [ 0.22685121,  0.51898501,  0.66574396,  1. ],
+ [ 0.38731259,  0.57588621,  0.39148022,  1. ],
+ [ 0.7655671 ,  0.38651289,  0.7099578,  1. ],
+ [ 1.        ,  0.78937332,  0.11607843,  1. ],
+ [ 0.75226453,  0.52958094,  0.16938101,  1. ],
+ [ 0.92752019,  0.48406   ,  0.67238756,  1. ],
+ [ 0.60000002,  0.60000002,  0.60000002,  1. ],
+ [ 0.8411765,  0.10196079,  0.10980392,  1. ],
+ [ 0.2685121,  0.1898501,  0.6574396,  1. ],
+ [ 0.38731259,  0.5758621,  0.9148022,  1. ],
+ [ 0.7655671 ,  0.38651289,  0.37099578,  1. ],
+ [ 1.        ,  0.8937332,  0.1160743,  1. ],
+ [ 0.5226453,  0.2958094,  0.16938101,  1. ],
+ [ 0.2752019,  0.48406   ,  0.67238756,  1. ],
+ [ 0.0000002,  0.60000002,  0.60000002,  1. ],
+ [ 0.89411765,  0.0196079,  0.10980392,  1. ],
+ [ 0.2685121,  0.1898501,  0.66574396,  1. ],
+ [ 0.38731259,  0.57588621,  0.39148022,  1. ],
+ [ 0.7655671 ,  0.8651289,  0.37099578,  1. ],
+ [ 1.        ,  0.8937332,  0.1607843,  1. ],
+ [ 0.5226453,  0.52958094,  0.16938101,  1. ],
+ [ 0.2752019,  0.48406   ,  0.67238756,  1. ],
+ [ 0.60000002,  0.0000002,  0.60000002,  1. ],
+ [ 1.        ,  0.8937332,  0.1607843,  1. ],
+ [ 0.89411765,  0.10196079,  0.10980392,  1. ],
+ [ 0.22685121,  0.51898501,  0.66574396,  1. ],
+ [ 0.38731259,  0.57588621,  0.39148022,  1. ],
+ [ 0.5226453,  0.52958094,  0.16938101,  1. ]
+
+])
+
+legend_list = []
+
+for i in range(len(topics)):   
+    color = colors[i]
+    legend_list.append(mpatches.Ellipse((0, 0), 1, 1, fc=color))
+
+matplotlib.rc('font',family='monospace')
+plt.style.use('ggplot')
+
+
+fig, axs = plt.subplots(1,1, figsize=(15, 10), facecolor='w', edgecolor='k')
+fig.subplots_adjust(hspace = .1, wspace=0)
+
+
+count = 0
+legend = []
+data = tsne_embedding
+scatter = axs.scatter(data=data,x='x',y='y',s=6,c=data['hue'],cmap="Set1")
+axs.axis('off')
+
+# plt.suptitle("Cluster Topics using TSNE",**{'fontsize':'14','weight':'bold'})
+# plt.figtext(.51,0.95,'TSNE on abstract:', ha='center')
+
+
+fig.legend(legend_list,topics,loc=(0.1,0.89),ncol=4)
+plt.subplots_adjust(top=0.85)
+
+plt.show()
